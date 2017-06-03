@@ -44,6 +44,7 @@ tf-tensorboard is the frontend entry point for TensorBoard.
 It implements a toolbar (via paper-header-panel and paper-toolbar) that
 allows the user to toggle between various dashboards.
 -->
+<script src="autoReloadBehavior.js"></script>
 <dom-module id="tf-tensorboard">
   <template>
     <paper-dialog with-backdrop id="settings">
@@ -209,22 +210,17 @@ allows the user to toggle between various dashboards.
 
     </style>
   </template>
-  <script src="autoReloadBehavior.js"></script>
   <script>
-    import {AutoReloadBehavior} from "./autoReloadBehavior";
-    import {Backend} from "../tf-backend/backend";
-    import {TABS, setUseHash} from "../tf-globals/globals";
-    import {getString, setString, TAB} from "../tf-storage/storage";
-    import * as backend_router from "../tf-backend/router";
+    "use strict";
 
     Polymer({
       is: "tf-tensorboard",
-      behaviors: [AutoReloadBehavior],
+      behaviors: [TF.TensorBoard.AutoReloadBehavior],
       properties: {
         router: {
           type: Object,
           value: function() {
-            return backend_router.router();
+            return TF.Backend.router();
           },
         },
         _backend: {
@@ -249,7 +245,7 @@ allows the user to toggle between various dashboards.
         tabs: {
           type: Array,
           readOnly: true,
-          value: TABS,
+          value: TF.Globals.TABS,
         },
         // If this is set to a string, TensorBoard will switch to "demo mode"
         // and attempt to load serialized json data from that directory. You can
@@ -275,15 +271,15 @@ allows the user to toggle between various dashboards.
       },
       _getModeFromIndex: function(modeIndex) {
         var mode = this.tabs[modeIndex];
-        setString(TAB, mode);
+        TF.URIStorage.setString(TF.URIStorage.TAB, mode);
         return mode;
       },
       _makeBackend: function(router, demoDir) {
         // use the demoDir if it is set, otherwise use the provided router
         if (demoDir != null) {
-          router = backend_router.router(demoDir, true);
+          router = TF.Backend.router(demoDir, true);
         }
-        return new Backend(router);
+        return new TF.Backend.Backend(router);
       },
       _isReloadDisabled: function(mode) {
         return !this._debuggerDataEnabled && this._modeIsGraphs(mode);
@@ -320,7 +316,7 @@ allows the user to toggle between various dashboards.
         return dashboard;
       },
       ready: function() {
-        setUseHash(this.useHash);
+        TF.Globals.setUseHash(this.useHash);
 
         this._getModeFromHash();
         window.addEventListener('hashchange', function() {
@@ -328,7 +324,7 @@ allows the user to toggle between various dashboards.
         }.bind(this));
       },
       _getModeFromHash: function() {
-        var tabName = getString(TAB);
+        var tabName = TF.URIStorage.getString(TF.URIStorage.TAB);
         var modeIndex = this.tabs.indexOf(tabName);
         if (modeIndex == -1 && this.modeIndex == null) {
           // Select the first tab as default.
@@ -352,4 +348,5 @@ allows the user to toggle between various dashboards.
       },
     });
   </script>
+  <script src="autoReloadBehavior.js"></script>
 </dom-module>

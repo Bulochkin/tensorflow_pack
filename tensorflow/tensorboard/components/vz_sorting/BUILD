@@ -1,28 +1,56 @@
 package(default_visibility = ["//tensorflow:internal"])
 
-load("//tensorflow/tensorboard:defs.bzl", "tensorboard_webcomponent_library")
-load("//tensorflow/tensorboard:web.bzl", "ts_web_library")
+load("@io_bazel_rules_closure//closure:defs.bzl", "web_library")
+load("//tensorflow/tensorboard:hacks.bzl", "tensorboard_typescript_bundle")
+load("//tensorflow/tensorboard:defs.bzl", "tensorboard_typescript_genrule")
 
 licenses(["notice"])  # Apache 2.0
 
-ts_web_library(
+web_library(
     name = "vz_sorting",
     srcs = [
-        "sorting.ts",
+        "bundle.js",
         "vz-sorting.html",
     ],
     path = "/vz-sorting",
     visibility = ["//visibility:public"],
 )
 
-tensorboard_webcomponent_library(
-    name = "legacy",
-    srcs = [":vz_sorting"],
-    destdir = "vz-sorting",
+tensorboard_typescript_genrule(
+    name = "ts",
+    srcs = ["bundle.ts"],
+)
+
+tensorboard_typescript_bundle(
+    name = "bundle",
+    out = "bundle.ts",
+    namespace_srcs = {"VZ.Sorting": ["sorting.ts"]},
 )
 
 filegroup(
     name = "all_files",
     srcs = glob(["**"]),
     tags = ["notsan"],
+)
+
+################################################################################
+# MARKED FOR DELETION
+
+load("//tensorflow/tensorboard:defs.bzl", "tensorboard_ts_library")
+load("//tensorflow/tensorboard:defs.bzl", "tensorboard_webcomponent_library")
+
+tensorboard_webcomponent_library(
+    name = "legacy",
+    srcs = [
+        "vz-sorting.html",
+        ":legacy_ts",
+    ],
+    destdir = "vz-sorting",
+)
+
+tensorboard_ts_library(
+    name = "legacy_ts",
+    srcs = ["sorting.ts"],
+    deps_mgmt = "off",
+    runtime = "nodejs",
 )

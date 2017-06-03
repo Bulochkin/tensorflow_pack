@@ -3,30 +3,39 @@ package(
     default_visibility = ["//tensorflow:internal"],
 )
 
-load("//tensorflow/tensorboard:vulcanize.bzl", "tensorboard_html_binary")
-load("//tensorflow/tensorboard:web.bzl", "ts_web_library")
+load("@io_bazel_rules_closure//closure:defs.bzl", "web_library")
+load("//tensorflow/tensorboard:hacks.bzl", "tensorboard_typescript_bundle")
+load("//tensorflow/tensorboard:defs.bzl", "tensorboard_typescript_genrule")
 
 licenses(["notice"])  # Apache 2.0
 
-ts_web_library(
+web_library(
     name = "test",
     srcs = [
-        "sortingTests.ts",
+        "bundle.js",
         "tests.html",
     ],
     path = "/vz-sorting/test",
     deps = [
-        "//tensorflow/tensorboard/components/tf_imports:web_component_tester",
         "//tensorflow/tensorboard/components/vz_sorting",
+        "@org_npmjs_registry_web_component_tester",
     ],
 )
 
-tensorboard_html_binary(
-    name = "devserver",
-    compilation_level = "WHITESPACE_ONLY",
-    input_path = "/vz-sorting/test/tests.html",
-    output_path = "/vz-sorting/test/tests.html",
-    deps = [":test"],
+tensorboard_typescript_genrule(
+    name = "ts",
+    srcs = ["bundle.ts"],
+    typings = [
+        "@org_definitelytyped//:mocha.d.ts",
+        "@org_definitelytyped//:chai.d.ts",
+        "//tensorflow/tensorboard/components/vz_sorting:bundle.d.ts",
+    ],
+)
+
+tensorboard_typescript_bundle(
+    name = "bundle",
+    out = "bundle.ts",
+    namespace_srcs = {"VZ.Sorting": ["sortingTests.ts"]},
 )
 
 filegroup(

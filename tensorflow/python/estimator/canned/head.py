@@ -459,7 +459,7 @@ class _MultiClassHeadWithSoftmaxCrossEntropyLoss(_Head):
 
 
 def _binary_logistic_head_with_sigmoid_cross_entropy_loss(
-    weight_feature_key=None, thresholds=None):
+    weight_feature_key=None, thresholds=(0.5,)):
   """Creates a `Head` for single label binary classification.
 
   This head uses `sigmoid_cross_entropy_with_logits` loss.
@@ -482,7 +482,6 @@ def _binary_logistic_head_with_sigmoid_cross_entropy_loss(
   Raises:
     ValueError: if `thresholds` contains a value outside of `(0, 1)`.
   """
-  thresholds = tuple(thresholds) if thresholds else tuple()
   for threshold in thresholds:
     if (threshold <= 0.0) or (threshold >= 1.0):
       raise ValueError('thresholds not in (0, 1): %s.' % (thresholds,))
@@ -495,7 +494,7 @@ class _BinaryLogisticHeadWithSigmoidCrossEntropyLoss(_Head):
 
   def __init__(self, weight_feature_key=None, thresholds=None):
     self._weight_feature_key = weight_feature_key
-    self._thresholds = thresholds
+    self._thresholds = tuple(thresholds)
 
   @property
   def logits_dimension(self):

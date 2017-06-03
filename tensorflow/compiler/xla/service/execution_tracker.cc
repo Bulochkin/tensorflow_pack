@@ -31,7 +31,7 @@ AsyncExecution::AsyncExecution(Backend* backend,
     : backend_(CHECK_NOTNULL(backend)),
       streams_(std::move(streams)),
       profile_(profile),
-      result_(std::move(result)) {
+      result_(result) {
   for (const auto& stream : streams_) {
     CHECK(stream != nullptr);
   }

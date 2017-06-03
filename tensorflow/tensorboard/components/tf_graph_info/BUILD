@@ -1,11 +1,10 @@
 package(default_visibility = ["//tensorflow:internal"])
 
-load("//tensorflow/tensorboard:defs.bzl", "tensorboard_webcomponent_library")
-load("//tensorflow/tensorboard:web.bzl", "ts_web_library")
+load("@io_bazel_rules_closure//closure:defs.bzl", "web_library")
 
 licenses(["notice"])  # Apache 2.0
 
-ts_web_library(
+web_library(
     name = "tf_graph_info",
     srcs = [
         "tf-graph-icon.html",
@@ -17,7 +16,7 @@ ts_web_library(
     deps = [
         "//tensorflow/tensorboard/components/tf_dashboard_common",
         "//tensorflow/tensorboard/components/tf_graph_common",
-        "//tensorflow/tensorboard/components/tf_imports:polymer",
+        "@org_polymer",
         "@org_polymer_iron_collapse",
         "@org_polymer_iron_list",
         "@org_polymer_paper_icon_button",
@@ -27,25 +26,28 @@ ts_web_library(
     ],
 )
 
-tensorboard_webcomponent_library(
-    name = "legacy",
-    srcs = [":tf_graph_info"],
-    destdir = "tf-graph-info",
-    deps = [
-        "//tensorflow/tensorboard/components/tf_dashboard_common:legacy",
-        "//tensorflow/tensorboard/components/tf_graph_common:legacy",
-        "//third_party/javascript/polymer/v1/iron-collapse:lib",
-        "//third_party/javascript/polymer/v1/iron-list:lib",
-        "//third_party/javascript/polymer/v1/paper-icon-button:lib",
-        "//third_party/javascript/polymer/v1/paper-item:lib",
-        "//third_party/javascript/polymer/v1/paper-slider:lib",
-        "//third_party/javascript/polymer/v1/paper-spinner:lib",
-        "//third_party/javascript/polymer/v1/polymer:lib",
-    ],
-)
-
 filegroup(
     name = "all_files",
     srcs = glob(["**"]),
     tags = ["notsan"],
+)
+
+################################################################################
+# MARKED FOR DELETION
+
+load("//tensorflow/tensorboard:defs.bzl", "tensorboard_webcomponent_library")
+
+tensorboard_webcomponent_library(
+    name = "legacy",
+    srcs = [
+        "tf-graph-icon.html",
+        "tf-graph-info.html",
+        "tf-node-info.html",
+        "tf-node-list-item.html",
+    ],
+    destdir = "tf-graph-info",
+    deps = [
+        "//tensorflow/tensorboard/components/tf_dashboard_common:legacy",
+        "//tensorflow/tensorboard/components/tf_graph_common:legacy",
+    ],
 )

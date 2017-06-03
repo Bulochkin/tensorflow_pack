@@ -82,11 +82,7 @@ tf-text-dashboard displays a dashboard that loads texts from a TensorFlow run.
     </style>
   </template>
   <script>
-    import {DashboardBehavior} from "../tf-dashboard-common/dashboard-behavior";
-    import {ReloadBehavior} from "../tf-dashboard-common/reload-behavior";
-    import {BackendBehavior} from "../tf-backend/behavior";
-
-    Polymer({
+    TF.Dashboard.TfTextDashboard = Polymer({
       is: "tf-text-dashboard",
       factoryImpl: function(backend) {
         this.backend = backend;
@@ -99,9 +95,9 @@ tf-text-dashboard displays a dashboard that loads texts from a TensorFlow run.
         },
       },
       behaviors: [
-        DashboardBehavior("text"),
-        ReloadBehavior("tf-chart-scaffold"),
-        BackendBehavior,
+        TF.Dashboard.DashboardBehavior("text"),
+        TF.Dashboard.ReloadBehavior("tf-chart-scaffold"),
+        TF.Backend.BackendBehavior,
       ],
       attached: function() {
         this.async(function() {

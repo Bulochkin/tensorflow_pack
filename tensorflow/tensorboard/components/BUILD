@@ -1,18 +1,21 @@
 package(default_visibility = ["//tensorflow:internal"])
 
-load("//tensorflow/tensorboard:web.bzl", "ts_web_library")
+load("@io_bazel_rules_closure//closure:defs.bzl", "web_library")
 load("//tensorflow/tensorboard:vulcanize.bzl", "tensorboard_html_binary")
 
 licenses(["notice"])  # Apache 2.0
 
-ts_web_library(
+web_library(
     name = "tensorboard",
     srcs = [
         "analytics.html",
         "tensorboard.html",
     ],
     path = "/",
-    deps = ["//tensorflow/tensorboard/components/tf_tensorboard"],
+    deps = [
+        "//tensorflow/tensorboard/components/tf_tensorboard",
+        "@org_polymer_webcomponentsjs",
+    ],
 )
 
 tensorboard_html_binary(

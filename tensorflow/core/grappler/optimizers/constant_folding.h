@@ -16,7 +16,6 @@ limitations under the License.
 #ifndef TENSORFLOW_GRAPPLER_OPTIMIZERS_CONSTANT_FOLDING_H_
 #define TENSORFLOW_GRAPPLER_OPTIMIZERS_CONSTANT_FOLDING_H_
 
-#include <regex>
 #include "tensorflow/core/framework/device_base.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/grappler/optimizers/graph_optimizer.h"
@@ -30,7 +29,7 @@ const char kConstantFoldingConst[] = "ConstantFolding";
 // Contant folding optimization for a graph.
 class ConstantFolding : public GraphOptimizer {
  public:
-  ConstantFolding();
+  ConstantFolding() {}
 
   ~ConstantFolding() override {}
 
@@ -51,7 +50,7 @@ class ConstantFolding : public GraphOptimizer {
 
   Status EvaluateNode(const NodeDef& node,
                       const gtl::InlinedVector<TensorValue, 4>& inputs,
-                      gtl::InlinedVector<TensorValue, 4>* output) const;
+                      gtl::InlinedVector<TensorValue, 4>* output);
 
   Status EvaluateOneFoldable(const NodeDef& node,
                              std::vector<NodeDef>* outputs);
@@ -60,14 +59,18 @@ class ConstantFolding : public GraphOptimizer {
 
   Status FoldGraph(GraphDef* output);
 
-  bool IsSimplifiableReduction(const NodeDef& node) const;
-  Status SimplifyGraph(GraphDef* output);
-
   std::unique_ptr<DeviceBase> device_;
   GraphDef graph_;
   std::unique_ptr<NodeMap> node_map_;
   std::set<string> nodes_to_preserve_;
-  std::regex ops_to_preserve_;
+  std::set<string> ops_to_preserve_ = {"Save",
+                                       "SaveV2",
+                                       "SaveSlices",
+                                       "Restore",
+                                       "RestoreV2",
+                                       "RestoreSlice",
+                                       "PlaceholderWithDefault",
+                                       "Const"};
 };
 
 }  // end namespace grappler

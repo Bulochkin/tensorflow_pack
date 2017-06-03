@@ -27,7 +27,6 @@ namespace {
 std::vector<char *> CharPointerVectorFromStrings(
     const std::vector<string> &strings) {
   std::vector<char *> result;
-  result.reserve(strings.size());
   for (const string &string : strings) {
     result.push_back(const_cast<char *>(string.c_str()));
   }

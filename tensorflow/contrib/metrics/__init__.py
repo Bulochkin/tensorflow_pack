@@ -23,7 +23,6 @@ See the @{$python/contrib.metrics} guide.
 @@streaming_precision
 @@streaming_precision_at_thresholds
 @@streaming_auc
-@@streaming_curve_points
 @@streaming_recall_at_k
 @@streaming_mean_absolute_error
 @@streaming_mean_iou
@@ -77,7 +76,6 @@ from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_accuracy
 from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_auc
 from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_concat
 from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_covariance
-from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_curve_points
 from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_false_negatives
 from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_false_negatives_at_thresholds
 from tensorflow.contrib.metrics.python.ops.metric_ops import streaming_false_positives

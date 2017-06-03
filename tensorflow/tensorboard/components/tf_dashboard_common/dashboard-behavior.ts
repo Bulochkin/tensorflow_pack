@@ -16,8 +16,6 @@ limitations under the License.
 /**
  * A behavior that TensorBoard dashboards must implement. This behavior serves
  * the purpose of an interface.
- *
- * @polymerBehavior
  */
 export function DashboardBehavior(dashboardName) {
   return {

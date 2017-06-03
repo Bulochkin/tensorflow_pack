@@ -613,7 +613,6 @@ REGISTER_OP("Const")
       TF_RETURN_IF_ERROR(TensorShape::IsValidShape(proto->tensor_shape()));
       TensorShape shape(proto->tensor_shape());
       std::vector<DimensionHandle> dims;
-      dims.reserve(shape.dims());
       for (int i = 0; i < shape.dims(); ++i) {
         dims.push_back(c->MakeDim(shape.dim_size(i)));
       }
@@ -895,7 +894,6 @@ REGISTER_OP("MatrixDiagPart")
       }
       const int32 rank = c->Rank(in);
       std::vector<DimensionHandle> dims;
-      dims.reserve(rank - 2);
       for (int i = 0; i < rank - 2; ++i) dims.push_back(c->Dim(in, i));
 
       DimensionHandle min_dim;

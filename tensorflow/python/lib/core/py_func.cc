@@ -347,7 +347,6 @@ Status ConvertTensorToNdarray(const Tensor& t, PyObject** ret) {
   PyArray_Descr* descr = PyArray_DescrFromType(typenum);
   CHECK(descr);
   std::vector<npy_intp> dims;
-  dims.reserve(t.dims());
   for (int i = 0; i < t.dims(); ++i) {
     dims.push_back(t.dim_size(i));
   }

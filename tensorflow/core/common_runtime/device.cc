@@ -30,11 +30,7 @@ Device::Device(Env* env, const DeviceAttributes& device_attributes)
   rmgr_ = new ResourceMgr(parsed_name_.job);
 }
 
-Device::~Device() {
-  if (rmgr_ != nullptr) {
-    DeleteResourceMgr();
-  }
-}
+Device::~Device() { delete rmgr_; }
 
 // static
 DeviceAttributes Device::BuildDeviceAttributes(

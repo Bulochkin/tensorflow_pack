@@ -1,7 +1,5 @@
 licenses(["notice"])  # Apache 2.0
 
-load("//tensorflow:tensorflow.bzl", "tf_cuda_library")
-
 filegroup(
     name = "all_files",
     srcs = glob(
@@ -22,7 +20,7 @@ config_setting(
     },
 )
 
-tf_cuda_library(
+cc_library(
     name = "utils",
     srcs = ["utils.cc"],
     hdrs = [

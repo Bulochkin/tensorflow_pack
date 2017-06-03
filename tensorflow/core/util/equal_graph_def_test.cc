@@ -13,8 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include <utility>
-
 #include "tensorflow/core/util/equal_graph_def.h"
 
 #include "tensorflow/core/framework/node_def_util.h"
@@ -42,7 +40,7 @@ Node* Alternate(const GraphDefBuilder::Options& opts) {
 
 Node* Combine(ops::NodeOut a, ops::NodeOut b,
               const GraphDefBuilder::Options& opts) {
-  return ops::BinaryOp("Combine", std::move(a), std::move(b), opts);
+  return ops::BinaryOp("Combine", a, b, opts);
 }
 
 class EqualGraphDefTest : public ::testing::Test {

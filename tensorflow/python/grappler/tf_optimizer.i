@@ -67,9 +67,7 @@ PyObject* TF_OptimizeGraph(
       const tensorflow::RewriterConfig& rewriter_config,
       const tensorflow::MetaGraphDef& metagraph,
       const string& graph_id, TF_Status* out_status) {
-    tensorflow::grappler::ItemConfig item_config;
-    item_config.inline_functions = false;
-    item_config.apply_optimizations = false;
+    const tensorflow::grappler::ItemConfig item_config;
     std::unique_ptr<tensorflow::grappler::GrapplerItem> grappler_item =
         tensorflow::grappler::GrapplerItemFromMetaGraphDef(graph_id, metagraph, item_config);
     std::unordered_map<string, tensorflow::DeviceProperties> device_map;

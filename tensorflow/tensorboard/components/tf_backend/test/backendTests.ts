@@ -105,6 +105,9 @@ describe('backend tests', () => {
       const audio = audioClips[0];
       assertIsDatum(audio);
       chai.assert.equal(audio.content_type, 'audio/wav');
+      const nonDemoQuery = 'index=0&tag=audio1&run=run1';
+      const expectedUrl = demoRouter.individualAudio(nonDemoQuery);
+      chai.assert.equal(audio.url, expectedUrl);
       done();
     });
   });
@@ -135,11 +138,11 @@ describe('backend tests', () => {
       chai.assert.deepEqual(x, image);
       next();
     });
-    backend.audioTags().then((x) => {
+    backend.audioRuns().then((x) => {
       chai.assert.deepEqual(x, audio);
       next();
     });
-    backend.runMetadataTags().then((x) => {
+    backend.runMetadataRuns().then((x) => {
       chai.assert.deepEqual(x, runMetadata);
       next();
     });

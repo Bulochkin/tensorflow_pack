@@ -47,7 +47,6 @@ TEST_F(LogTest, LogTenValues) {
   builder.Log(x);
 
   std::vector<float> expected;
-  expected.reserve(input.size());
   for (float f : input) {
     expected.push_back(std::log(f));
   }

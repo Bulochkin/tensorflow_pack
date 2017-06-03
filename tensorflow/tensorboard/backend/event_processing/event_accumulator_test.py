@@ -24,6 +24,7 @@ import six
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
+from tensorflow.python.platform import googletest
 from tensorflow.python.summary.writer.writer import SummaryToEventTransformer
 from tensorflow.tensorboard.backend.event_processing import event_accumulator as ea
 
@@ -181,7 +182,7 @@ class MockingEventAccumulatorTest(EventAccumulatorTest):
 
   def setUp(self):
     super(MockingEventAccumulatorTest, self).setUp()
-    self.stubs = tf.test.StubOutForTesting()
+    self.stubs = googletest.StubOutForTesting()
     self._real_constructor = ea.EventAccumulator
     self._real_generator = ea._GeneratorFromPath
 

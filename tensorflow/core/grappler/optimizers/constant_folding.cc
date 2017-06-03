@@ -101,11 +101,6 @@ Status NumOutputs(const NodeDef& node, int* num_outputs) {
 }
 }  // namespace
 
-ConstantFolding::ConstantFolding() {
-  ops_to_preserve_ =
-      std::regex("Placeholder.*|Const|.*Save.*|.*Restore.*|.*Reader");
-}
-
 Status ConstantFolding::MaterializeShapes(const GrapplerItem& item) {
   GraphProperties properties(item);
   TF_RETURN_IF_ERROR(properties.InferStatically());
@@ -181,7 +176,7 @@ Status ConstantFolding::MaterializeShapes(const GrapplerItem& item) {
 
         // Turn the inputs into control dependencies.
         CHECK_EQ(1, node.input_size());
-        node.set_input(0, strings::StrCat("^", NodeName(node.input(0))));
+        node.set_input(0, strings::StrCat("^", node.input(0)));
       }
     }
   }
@@ -189,19 +184,28 @@ Status ConstantFolding::MaterializeShapes(const GrapplerItem& item) {
 }
 
 bool ConstantFolding::IsFoldable(const NodeDef& node) const {
-  // Skips nodes that must be preserved, and op_types that don't benefit from
-  // folding
+  DeviceTypeVector device_types;
+  auto status = SupportedDeviceTypesForNode({DeviceType(DEVICE_CPU)}, node,
+                                            &device_types);
+  if (!status.ok()) {
+    return false;
+  }
+  // Only fold ops with a CPU implementation available.
+  if (device_types[0] != DeviceType(DEVICE_CPU)) {
+    return false;
+  }
+
   if (nodes_to_preserve_.find(node.name()) != nodes_to_preserve_.end()) {
     return false;
   }
-  std::cmatch match;
-  if (std::regex_match(node.op().c_str(), match, ops_to_preserve_)) {
+
+  if (ops_to_preserve_.find(node.op()) != ops_to_preserve_.end()) {
     return false;
   }
 
   // Don't fold stateful ops such as TruncatedNormal.
   const OpDef* op_def = nullptr;
-  Status status = OpRegistry::Global()->LookUpOpDef(node.op(), &op_def);
+  status = OpRegistry::Global()->LookUpOpDef(node.op(), &op_def);
   if (!status.ok()) {
     return false;
   }
@@ -210,17 +214,6 @@ bool ConstantFolding::IsFoldable(const NodeDef& node) const {
   }
 
   if (op_def->output_arg_size() == 0) {
-    return false;
-  }
-
-  DeviceTypeVector device_types;
-  status = SupportedDeviceTypesForNode({DeviceType(DEVICE_CPU)}, node,
-                                       &device_types);
-  if (!status.ok()) {
-    return false;
-  }
-  // Only fold ops with a CPU implementation available.
-  if (device_types[0] != DeviceType(DEVICE_CPU)) {
     return false;
   }
 
@@ -239,7 +232,7 @@ bool ConstantFolding::IsFoldable(const NodeDef& node) const {
   }
 
   for (const auto& input : node.input()) {
-    if (IsControlInput(input)) {
+    if (input[0] == '^') {
       continue;
     }
     bool is_const = IsConstant(*node_map_->GetNode(input));
@@ -274,7 +267,7 @@ NodeDef ConstantFolding::CreateNodeDef(const string& name,
 
 Status ConstantFolding::EvaluateNode(const NodeDef& node,
                                      const TensorVector& inputs,
-                                     TensorVector* output) const {
+                                     TensorVector* output) {
   Status status;
   auto op_kernel =
       CreateOpKernel("CPU", device_.get(), device_->GetAllocator({}), node,
@@ -306,7 +299,7 @@ Status ConstantFolding::EvaluateOneFoldable(const NodeDef& node,
                                             std::vector<NodeDef>* outputs) {
   TensorVector inputs;
   for (const auto& input : node.input()) {
-    if (IsControlInput(input)) {
+    if (input[0] == '^') {
       break;
     }
     TensorVector output;
@@ -344,12 +337,12 @@ Status ConstantFolding::FoldNode(const NodeDef& node, GraphDef* output) {
     node_map_->AddNode(added_node->name(), added_node);
 
     for (const auto& input : node.input()) {
-      if (IsControlInput(input)) {
+      if (input[0] == '^') {
         *added_node->add_input() = input;
       } else {
         NodeDef* input_node = node_map_->GetNode(input);
         for (const auto& fanin_of_input : input_node->input()) {
-          if (IsControlInput(fanin_of_input)) {
+          if (fanin_of_input[0] == '^') {
             *added_node->add_input() = fanin_of_input;
           }
         }
@@ -403,60 +396,6 @@ Status ConstantFolding::FoldGraph(GraphDef* output) {
   return Status::OK();
 }
 
-// Returns true iff this reduction can be reduced to an identity (i.e if the set
-// of dimensions to reduce along is empty). This happens often in the gradient
-// graphs.
-bool ConstantFolding::IsSimplifiableReduction(const NodeDef& node) const {
-  if (IsReduction(node)) {
-    CHECK_LE(2, node.input_size());
-    const NodeDef* reductions_indices = node_map_->GetNode(node.input(1));
-    if (IsConstant(*reductions_indices)) {
-      TensorVector output;
-      Status s = EvaluateNode(*reductions_indices, TensorVector(), &output);
-      if (!s.ok()) {
-        return false;
-      }
-      CHECK_EQ(1, output.size());
-      int output_size = output[0]->NumElements();
-      delete output[0].tensor;
-      if (output_size == 0) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-Status ConstantFolding::SimplifyGraph(GraphDef* output) {
-  for (auto& node : *output->mutable_node()) {
-    if (IsSimplifiableReduction(node)) {
-      // Replace the reduction node with an identity node, that can be further
-      // optimized by the model pruner.
-      const NodeDef* reductions_indices = node_map_->GetNode(node.input(1));
-      DataType output_type;
-      if (node.attr().count("T") > 0) {
-        output_type = node.attr().at("T").type();
-      } else {
-        // This is an 'any' or 'all' reduction. The output is always boolean.
-        output_type = DT_BOOL;
-      }
-      node.set_op("Identity");
-      node.clear_attr();
-      (*node.mutable_attr())["T"].set_type(output_type);
-      if (node.input_size() > 2) {
-        node.mutable_input()->SwapElements(1, node.input_size() - 1);
-      }
-      node.mutable_input()->RemoveLast();
-      for (const auto& input : reductions_indices->input()) {
-        if (IsControlInput(input)) {
-          *node.add_input() = input;
-        }
-      }
-    }
-  }
-  return Status::OK();
-}
-
 Status ConstantFolding::Optimize(Cluster* cluster, const GrapplerItem& item,
                                  GraphDef* output) {
   graph_ = item.graph;
@@ -465,14 +404,10 @@ Status ConstantFolding::Optimize(Cluster* cluster, const GrapplerItem& item,
   for (const auto& node : item.fetch) {
     nodes_to_preserve_.insert(NodeName(node));
   }
-  for (const auto& node : item.feed) {
-    nodes_to_preserve_.insert(NodeName(node.first));
-  }
   device_.reset(new DeviceSimple());
   *output = GraphDef();
   TF_RETURN_IF_ERROR(MaterializeShapes(item));
   TF_RETURN_IF_ERROR(FoldGraph(output));
-  TF_RETURN_IF_ERROR(SimplifyGraph(output));
   LOG(INFO) << "Optimized graph size: " << output->node_size();
   return Status::OK();
 }

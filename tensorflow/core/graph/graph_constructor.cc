@@ -91,36 +91,24 @@ class GraphConstructor {
     bool importing;
   };
 
-  typedef gtl::ArraySlice<const NodeDef*> NodeDefSlice;
-
-  // versions and library may be nullptr
-  static Status Construct(const Options& opts, NodeDefSlice node_defs,
-                          const VersionDef* versions,
-                          const FunctionDefLibrary* library, Graph* g,
+  static Status Construct(const Options& opts, const GraphDef* gdef, Graph* g,
                           ShapeRefiner* refiner,
                           std::vector<std::pair<Node*, int>>* return_tensors) {
-    if (versions) {
-      TF_RETURN_IF_ERROR(CheckVersions(*versions, TF_GRAPH_DEF_VERSION,
-                                       TF_GRAPH_DEF_VERSION_MIN_PRODUCER,
-                                       "GraphDef", "graph"));
-    }
-    GraphConstructor c(opts, node_defs, versions, library, g, refiner,
-                       return_tensors);
+    TF_RETURN_IF_ERROR(CheckVersions(gdef->versions(), TF_GRAPH_DEF_VERSION,
+                                     TF_GRAPH_DEF_VERSION_MIN_PRODUCER,
+                                     "GraphDef", "graph"));
+    GraphConstructor c(opts, gdef, g, refiner, return_tensors);
     const Status s = c.TryImport();
     if (!s.ok()) c.Undo();
     return s;
   }
 
  private:
-  GraphConstructor(const Options& opts, NodeDefSlice node_defs,
-                   const VersionDef* versions,
-                   const FunctionDefLibrary* library, Graph* g,
+  GraphConstructor(const Options& opts, const GraphDef* gdef, Graph* g,
                    ShapeRefiner* refiner,
                    std::vector<std::pair<Node*, int>>* return_tensors)
       : opts_(opts),
-        node_defs_(node_defs),
-        versions_(versions),
-        library_(library),
+        gdef_(gdef),
         g_(g),
         original_versions_(g->versions()),
         refiner_(refiner),
@@ -171,9 +159,7 @@ class GraphConstructor {
 
   // From constructor
   const Options opts_;
-  const NodeDefSlice node_defs_;
-  const VersionDef* versions_;
-  const FunctionDefLibrary* library_;
+  const GraphDef* gdef_;
   Graph* g_;
   const VersionDef original_versions_;
 
@@ -182,7 +168,7 @@ class GraphConstructor {
   // May be null. Not owned.
   std::vector<std::pair<Node*, int>>* return_tensors_;
 
-  // Mapping from node name to the index within node_defs_
+  // Mapping from node name to the index within gdef_
   struct NodeInfo {
     explicit NodeInfo(int i) : gdef_index(i), node(nullptr) {}
     // std::unordered_map<> requires that we have a default constructor.
@@ -197,18 +183,18 @@ class GraphConstructor {
   // Mapping from node name to the existing node in g_
   std::unordered_map<StringPiece, Node*, StringPiece::Hasher> existing_nodes_;
 
-  // Index of NodeDefs in node_defs_ with all inputs already converted.
+  // Index of NodeDefs in gdef_ with all inputs already converted.
   std::vector<int> ready_;
 
-  // Mapping between index within node_defs_ and the number of inputs that
+  // Mapping between index within gdef_ and the number of inputs that
   // still need to be converted.
   std::vector<int> pending_count_;
 
-  // Mapping between index within node_defs_ and the index within node_defs_ of
+  // Mapping between index within gdef_ and the index within gdef_ of
   // all nodes it outputs to.
   std::vector<gtl::InlinedVector<int, 4>> outputs_;
 
-  // Used in the conversion from node_defs_ to g_ to represent the ith input
+  // Used in the conversion from gdef_ to g_ to represent the ith input
   // of a node.
   struct InputInfo {
     explicit InputInfo(const string& node_name, Node* n, int i)
@@ -219,7 +205,7 @@ class GraphConstructor {
     int index;
   };
 
-  // Used in the conversion from node_defs_ to g_ to represent an edge from
+  // Used in the conversion from gdef_ to g_ to represent an edge from
   // the node named 'name' to node 'n'.
   struct EdgeInfo {
     explicit EdgeInfo(const string& name, int i1, Node* n, int i2)
@@ -268,8 +254,8 @@ Status GraphConstructor::EnsureNoNameCollisions() {
     }
   }
   if (opts_.prefix.empty() && opts_.importing) {
-    for (const NodeDef* n : node_defs_) {
-      const string& name = n->name();
+    for (int n = 0; n < gdef_->node_size(); ++n) {
+      const string& name = gdef_->node(n).name();
       if (existing_nodes_.find(name) != existing_nodes_.end()) {
         return errors::InvalidArgument("Node '", name,
                                        "' already exists in the Graph");
@@ -326,8 +312,8 @@ Status GraphConstructor::ValidateInputMapAndControlDependencies() {
 
 Status GraphConstructor::BuildNodeIndex() {
   // Validate the node names and add them to gdef_nodes_.
-  for (int n = 0; n < node_defs_.size(); ++n) {
-    const NodeDef& node_def = *node_defs_[n];
+  for (int n = 0; n < gdef_->node_size(); ++n) {
+    const NodeDef& node_def(gdef_->node(n));
     if (!IsValidNodeName(node_def.name(), opts_.allow_internal_ops)) {
       return errors::InvalidArgument(
           "Node '", node_def.name(),
@@ -365,13 +351,13 @@ Status GraphConstructor::BuildNodeIndex() {
 }
 
 Status GraphConstructor::InitFromEdges() {
-  const int num_nodes = node_defs_.size();
+  const int num_nodes = gdef_->node_size();
   pending_count_.reserve(num_nodes);
   outputs_.resize(num_nodes);
 
   // Parse the inputs for each node.
   for (int n = 0; n < num_nodes; ++n) {
-    const NodeDef& node_def = *node_defs_[n];
+    const NodeDef& node_def(gdef_->node(n));
     if (IsMerge(node_def)) {
       // for merge only wait for one non-control input.
       int32 num_control_edges = 0;
@@ -503,16 +489,13 @@ Status GraphConstructor::ModifyNodeDefForImport(NodeDef* node_def) {
   TF_RETURN_IF_ERROR(g_->op_registry()->LookUpOpDef(node_def->op(), &op_def));
   AddDefaultsToNodeDef(*op_def, node_def);
   TF_RETURN_IF_ERROR(ValidateNodeDef(*node_def, *op_def));
-  if (versions_) {
-    TF_RETURN_IF_ERROR(CheckOpDeprecation(*op_def, versions_->producer()));
-  }
+  TF_RETURN_IF_ERROR(CheckOpDeprecation(*op_def, gdef_->versions().producer()));
   return Status::OK();
 }
 
 void RemoveInputs(NodeDef* node_def, const std::vector<int>& inputs_to_remove) {
   // TODO(skyewm): is there a better way to do this?
   std::vector<string> inputs;
-  inputs.reserve(node_def->input_size());
   for (int i = 0; i < node_def->input_size(); ++i) {
     inputs.push_back(node_def->input(i));
   }
@@ -624,15 +607,10 @@ void GraphConstructor::AddPrefixToNodeDef(
 Status GraphConstructor::Convert() {
   // Import functions before adding nodes, since imported nodes may refer to
   // functions
-  if (library_) {
-    TF_RETURN_IF_ERROR(g_->AddFunctionLibrary(*library_));
-  }
+  TF_RETURN_IF_ERROR(g_->AddFunctionLibrary(gdef_->library()));
 
   std::vector<InputInfo> inputs;
   int processed = 0;
-
-  std::vector<bool> input_already_exists;
-
   // Process the NodeDefs in topological order.
   // (InitFromEdges() sets this up by filling in ready_ with nodes that have no
   // inputs, pending_counts_ with the number of inputs for each node and
@@ -644,16 +622,16 @@ Status GraphConstructor::Convert() {
     inputs.clear();
     bool has_data_back_edge = false;
 
-    const NodeDef& original_node_def = *node_defs_[o];
+    const NodeDef& original_node_def = gdef_->node(o);
     NodeDef imported_node_def;
     const NodeDef* node_def;
 
     // input_already_exists[i] is true iff the i-th input of the node we're
     // importing refers to a preexisting node in g_ (i.e. input[i] existed prior
-    // to importing node_defs_).  Conversely, input_already_exists[i] is false
-    // iff the input refers to a node in node_defs_.
-    input_already_exists.clear();
-    input_already_exists.resize(original_node_def.input_size(), false);
+    // to importing gdef_).  Conversely, input_already_exists[i] is false iff
+    // the input refers to a node in gdef_.
+    std::vector<bool> input_already_exists(original_node_def.input_size(),
+                                           false);
 
     if (opts_.importing) {
       // TODO(ashankar): The line below means an additional copy of the NodeDef,
@@ -749,8 +727,8 @@ Status GraphConstructor::Convert() {
     }
   }
 
-  if (processed < node_defs_.size()) {
-    return errors::InvalidArgument(node_defs_.size() - processed,
+  if (processed < gdef_->node_size()) {
+    return errors::InvalidArgument(gdef_->node_size() - processed,
                                    " nodes in a cycle");
   }
   return Status::OK();
@@ -774,21 +752,20 @@ Status GraphConstructor::AddBackEdges() {
 }
 
 Status GraphConstructor::UpdateVersionDef() {
-  if (versions_ == nullptr) return Status::OK();
-
   if (!opts_.importing) {
-    g_->set_versions(*versions_);
+    g_->set_versions(gdef_->versions());
     return Status::OK();
   }
   VersionDef versions = g_->versions();
-  versions.set_producer(std::min(versions.producer(), versions_->producer()));
+  versions.set_producer(
+      std::min(versions.producer(), gdef_->versions().producer()));
   versions.set_min_consumer(
-      std::max(versions.min_consumer(), versions_->min_consumer()));
-  if (versions_->bad_consumers_size() > 0) {
+      std::max(versions.min_consumer(), gdef_->versions().min_consumer()));
+  if (gdef_->versions().bad_consumers_size() > 0) {
     std::set<int> bad(versions.bad_consumers().begin(),
                       versions.bad_consumers().end());
-    bad.insert(versions_->bad_consumers().begin(),
-               versions_->bad_consumers().end());
+    bad.insert(gdef_->versions().bad_consumers().begin(),
+               gdef_->versions().bad_consumers().end());
     versions.clear_bad_consumers();
     for (int v : bad) {
       versions.add_bad_consumers(v);
@@ -856,20 +833,7 @@ Status GraphConstructor::MakeEdge(Node* src, int output_index, Node* dst,
 Status ConvertGraphDefToGraph(const GraphConstructorOptions& opts,
                               const GraphDef& gdef, Graph* g) {
   ShapeRefiner refiner(gdef.versions().producer(), g->op_registry());
-  return GraphConstructor::Construct(opts, gdef.node(), &gdef.versions(),
-                                     &gdef.library(), g, &refiner, nullptr);
-}
-
-Status ConvertNodeDefsToGraph(const GraphConstructorOptions& opts,
-                              gtl::ArraySlice<NodeDef> nodes, Graph* g) {
-  ShapeRefiner refiner(TF_GRAPH_DEF_VERSION, g->op_registry());
-  // TODO(irving): Copy will go away once NodeInfo exists
-  std::vector<const NodeDef*> node_defs;
-  for (const auto& n : nodes) {
-    node_defs.push_back(&n);
-  }
-  return GraphConstructor::Construct(opts, node_defs, nullptr, nullptr, g,
-                                     &refiner, nullptr);
+  return GraphConstructor::Construct(opts, &gdef, g, &refiner, nullptr);
 }
 
 Status ImportGraphDef(const ImportGraphDefOptions& opts, const GraphDef& gdef,
@@ -918,9 +882,7 @@ Status ImportGraphDef(const ImportGraphDefOptions& opts, const GraphDef& gdef,
   refiner->set_graph_def_version(
       std::min(refiner->graph_def_version(), gdef.versions().producer()));
 
-  return GraphConstructor::Construct(opts, gdef.node(), &gdef.versions(),
-                                     &gdef.library(), g, refiner,
-                                     return_tensors);
+  return GraphConstructor::Construct(opts, &gdef, g, refiner, return_tensors);
 }
 
 void CopyGraph(const Graph& src, Graph* dest) {

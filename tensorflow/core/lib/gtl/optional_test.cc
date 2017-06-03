@@ -1078,7 +1078,6 @@ TEST(optionalTest, NoExcept) {
   static_assert(
       !std::is_nothrow_move_constructible<optional<MoveMeThrow>>::value, "");
   std::vector<optional<MoveMeNoThrow>> v;
-  v.reserve(10);
   for (int i = 0; i < 10; ++i) v.emplace_back();
 }
 

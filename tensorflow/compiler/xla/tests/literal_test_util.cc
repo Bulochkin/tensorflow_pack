@@ -262,7 +262,7 @@ class NearComparator {
     max_abs_err_ = 0.0;
     *miscompares_.mutable_shape() =
         ShapeUtil::ChangeElementType(actual.shape(), PRED);
-    miscompares_.mutable_preds()->resize(
+    miscompares_.mutable_preds()->Resize(
         ShapeUtil::ElementsIn(miscompares_.shape()), false);
     multi_index_.resize(expected.shape().dimensions_size(), 0);
 
@@ -389,7 +389,7 @@ class NearComparator {
         tensorflow::strings::Printf("tempfile-%s-%llx-%s", Hostname().c_str(),
                                     now_usec, name.c_str()));
     TF_CHECK_OK(tensorflow::WriteBinaryProto(tensorflow::Env::Default(),
-                                             filename, literal.ToProto()));
+                                             filename, literal));
     LOG(ERROR) << "wrote to " << name << " file: " << filename;
   }
 

@@ -279,8 +279,7 @@ def MonitoredTrainingSession(master='',  # pylint: disable=invalid-name
   For a chief, this utility sets proper session initializer/restorer. It also
   creates hooks related to checkpoint and summary saving. For workers, this
   utility sets proper session creator which waits for the chief to
-  initialize/restore. Please check `tf.train.MonitoredSession` for more
-  information.
+  initialize/restore.
 
 
   Args:
@@ -633,12 +632,6 @@ class MonitoredSession(_MonitoredSession):
   ```
 
   See `MonitoredTrainingSession` for an example usage based on chief or worker.
-
-  Note: This is not a `tf.Session`. For example, it cannot do following:
-
-  * it cannot be set as default session.
-  * it cannot be sent to saver.save.
-  * it cannot be sent to tf.train.start_queue_runners.
 
   Args:
     session_creator: A factory object to create session. Typically a

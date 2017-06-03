@@ -295,7 +295,6 @@ void ExpectVecsEquiv(const std::vector<float>& vec1,
 std::vector<float> GetWeightsByIndex(const std::vector<float>& weights,
                                      const std::vector<int>& indices) {
   std::vector<float> res;
-  res.reserve(indices.size());
   for (const int index : indices) {
     res.push_back(weights[index]);
   }

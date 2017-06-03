@@ -140,7 +140,7 @@ class FunctionInstantiationHelper {
   FunctionInstantiationHelper(GetFunctionSignature get_function,
                               InstantiationResult* result)
       : get_function_(std ::move(get_function)), result_(*result) {
-    result_.nodes.clear();
+    result_.gdef.Clear();
   }
 
   // Builds index for nodes that can be used as node's input arguments.
@@ -151,14 +151,15 @@ class FunctionInstantiationHelper {
     TF_RETURN_IF_ERROR(
         ArgNumType(attr_values, arg_def, &is_type_list, &dtypes));
     CHECK_GE(dtypes.size(), size_t{1});
-    int arg_index = result_.nodes.size();
+    GraphDef* gdef = &result_.gdef;
+    int arg_index = gdef->node_size();
     TF_RETURN_IF_ERROR(
         AddItem(arg_def.name(), {true, arg_index, 0, is_type_list, dtypes}));
-    // Creates dtypes.size() nodes in the graph.
+    // Creates dtypes.size() nodes in the gdef.
     for (size_t i = 0; i < dtypes.size(); ++i) {
       TF_RETURN_IF_ERROR(AddItem(strings::StrCat(arg_def.name(), ":", i),
                                  {true, arg_index, 0, false, {dtypes[i]}}));
-      DCHECK_EQ(arg_index, result_.nodes.size());
+      DCHECK_EQ(arg_index, gdef->node_size());
       string name = arg_def.name();
       if (dtypes.size() > 1) {
         strings::StrAppend(&name, "_", i);
@@ -331,13 +332,13 @@ class FunctionInstantiationHelper {
   // Adds the actual node inputs to the result graph by converting indexes to
   // the node names.
   void AddNodeInputs() {
-    for (int i = 0; i < result_.nodes.size(); i++) {
+    for (int i = 0; i < result_.gdef.node_size(); i++) {
       NodeInfo& node_info = nodes_[i];
       for (const auto& p : node_info.data_inputs) {
-        result_.nodes[i].add_input(Name(p.first, p.second));
+        result_.gdef.mutable_node(i)->add_input(Name(p.first, p.second));
       }
       for (int index : node_info.control_inputs) {
-        result_.nodes[i].add_input(Dep(index));
+        result_.gdef.mutable_node(i)->add_input(Dep(index));
       }
     }
   }
@@ -347,10 +348,11 @@ class FunctionInstantiationHelper {
   // node's input arguments.
   //
   // If is_func_arg is true, the name is a function's argument.  In
-  // this case, the produced graph def has node[nid:nid + dtype.size()].
+  // this case, the produced graph def has gdef.node[nid ... nid +
+  // dtype.size()).
   //
   // Otherwise, the name is a function body's node return value.  In
-  // this case, the produced graph def has one node node[nid] and
+  // this case, the produced graph def has one node gdef.node[nid] and
   // the node's output index [idx ... idx + num) corresponds to the
   // named outputs.
   //
@@ -396,11 +398,10 @@ class FunctionInstantiationHelper {
   }
 
   NodeDef* AddNode(const string& name) {
-    result_.nodes.emplace_back();
-    NodeDef* gnode = &result_.nodes.back();
+    NodeDef* gnode = result_.gdef.add_node();
     gnode->set_name(name);
     nodes_.push_back({name, {}, {}});
-    CHECK_EQ(result_.nodes.size(), nodes_.size());
+    CHECK_EQ(result_.gdef.node_size(), nodes_.size());
     return gnode;
   }
 
@@ -428,7 +429,7 @@ class FunctionInstantiationHelper {
     // Control inputs (dependencies).
     std::vector<int> control_inputs;
   };
-  // nodes_[i] is the information about result_.nodes[i].
+  // nodes_[i] is the information about result_.gdef.node(i).
   std::vector<NodeInfo> nodes_;
 };
 
@@ -544,17 +545,17 @@ string Print(const FunctionDef& fdef) {
   return out;
 }
 
-string Print(gtl::ArraySlice<const NodeDef*> nodes) {
+string Print(const GraphDef& gdef) {
   std::vector<const NodeDef*> arg;
   std::vector<const NodeDef*> ret;
   std::vector<const NodeDef*> body;
-  for (const NodeDef* n : nodes) {
-    if (n->op() == "_Arg") {
-      arg.push_back(n);
-    } else if (n->op() == "_Retval") {
-      ret.push_back(n);
+  for (const NodeDef& n : gdef.node()) {
+    if (n.op() == "_Arg") {
+      arg.push_back(&n);
+    } else if (n.op() == "_Retval") {
+      ret.push_back(&n);
     } else {
-      body.push_back(n);
+      body.push_back(&n);
     }
   }
   auto comp = [](const NodeDef* x, const NodeDef* y) {
@@ -569,11 +570,12 @@ string Print(gtl::ArraySlice<const NodeDef*> nodes) {
   string out;
   strings::StrAppend(&out, "\n(");
   auto get_type = [](const NodeDef& n) {
-    DataType dt;
-    if (!GetNodeAttr(n, "T", &dt).ok()) {
-      dt = DT_INVALID;
+    for (auto a : n.attr()) {
+      if (a.first == "T") {
+        return DataTypeString(a.second.type());
+      }
     }
-    return DataTypeString(dt);
+    return DataTypeString(DT_INVALID);
   };
   for (size_t i = 0; i < arg.size(); ++i) {
     const NodeDef* n = arg[i];
@@ -661,13 +663,13 @@ Status InstantiateFunction(const FunctionDef& fdef, AttrSlice attr_values,
 
   for (int i = 0; i < fdef.node_def_size(); ++i) {
     s = helper.BuildNodeOutputIndex(fdef.node_def(i), AttrSlice(&node_attrs[i]),
-                                    result->nodes.size() + i);
+                                    result->gdef.node_size() + i);
     if (!s.ok()) {
       errors::AppendToMessage(&s, "In ", SummarizeNodeDef(fdef.node_def(i)));
       return s;
     }
   }
-  // Emits one node for each fdef.node_def.
+  // Emits one gdef.node for each fdef.node_def.
   for (int i = 0; i < fdef.node_def_size(); ++i) {
     s = helper.InstantiateNode(fdef.node_def(i), AttrSlice(&node_attrs[i]));
     if (!s.ok()) {
@@ -695,19 +697,7 @@ Status InstantiateFunction(const FunctionDef& fdef, AttrSlice attr_values,
 string DebugString(const FunctionDef& func_def) { return Print(func_def); }
 
 string DebugString(const GraphDef& instantiated_func_def) {
-  std::vector<const NodeDef*> ptrs;
-  for (const NodeDef& n : instantiated_func_def.node()) {
-    ptrs.push_back(&n);
-  }
-  return Print(ptrs);
-}
-
-string DebugString(gtl::ArraySlice<NodeDef> instantiated_func_nodes) {
-  std::vector<const NodeDef*> ptrs;
-  for (const NodeDef& n : instantiated_func_nodes) {
-    ptrs.push_back(&n);
-  }
-  return Print(ptrs);
+  return Print(instantiated_func_def);
 }
 
 string DebugStringWhole(const GraphDef& gdef) {

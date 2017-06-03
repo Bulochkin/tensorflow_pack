@@ -3,23 +3,42 @@ package(
     default_visibility = ["//tensorflow:internal"],
 )
 
-load("//tensorflow/tensorboard:web.bzl", "ts_web_library")
+load("@io_bazel_rules_closure//closure:defs.bzl", "web_library")
+load("//tensorflow/tensorboard:hacks.bzl", "tensorboard_typescript_bundle")
+load("//tensorflow/tensorboard:defs.bzl", "tensorboard_typescript_genrule")
 
 licenses(["notice"])  # Apache 2.0
 
-ts_web_library(
+web_library(
     name = "test",
     srcs = [
+        "bundle.js",
         "tests.html",
-        "tf-categorizer-tests.ts",
     ],
     path = "/tf-dashboard-common/test",
     deps = [
         "//tensorflow/tensorboard/components/tf_dashboard_common",
-        "//tensorflow/tensorboard/components/tf_imports:polymer",
-        "//tensorflow/tensorboard/components/tf_imports:web_component_tester",
-        "//tensorflow/tensorboard/components/tf_imports:webcomponentsjs",
+        "@org_npmjs_registry_web_component_tester",
+        "@org_polymer",
+        "@org_polymer_webcomponentsjs",
     ],
+)
+
+tensorboard_typescript_genrule(
+    name = "ts",
+    srcs = ["bundle.ts"],
+    typings = [
+        "@org_definitelytyped//:chai.d.ts",
+        "@org_definitelytyped//:mocha.d.ts",
+        "//tensorflow/tensorboard/components/tf_dashboard_common:tf-categorizer-bundle.d.ts",
+    ],
+)
+
+tensorboard_typescript_bundle(
+    name = "bundle",
+    out = "bundle.ts",
+    namespace_srcs = {"TF.Dashboard": ["tf-categorizer-tests.ts"]},
+    namespace_symbol_aliases = {"TF.Dashboard": {"cat": "TF.Dashboard.Categorizer"}},
 )
 
 filegroup(

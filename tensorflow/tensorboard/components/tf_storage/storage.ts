@@ -12,8 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
-import {getFakeHash, setFakeHash, TABS, useHash} from '../tf-globals/globals';
+import * as _ from 'lodash';
+import {getFakeHash, setFakeHash, TABS, useHash} from '../tf_globals/globals';
 
 
 /* tslint:disable:no-namespace variable-name */

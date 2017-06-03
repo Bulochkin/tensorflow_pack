@@ -15,8 +15,12 @@ exports_files(["LICENSE"])
 
 cc_library(
     name = "wav_to_spectrogram_lib",
-    srcs = ["wav_to_spectrogram.cc"],
-    hdrs = ["wav_to_spectrogram.h"],
+    srcs = [
+        "wav_to_spectrogram.cc",
+    ],
+    hdrs = [
+        "wav_to_spectrogram.h",
+    ],
     deps = [
         "//tensorflow/cc:cc_ops",
         "//tensorflow/core:framework_internal",
@@ -26,10 +30,13 @@ cc_library(
 
 cc_binary(
     name = "wav_to_spectrogram",
-    srcs = ["main.cc"],
+    srcs = [
+        "main.cc",
+    ],
     deps = [
         ":wav_to_spectrogram_lib",
         "//tensorflow/core:framework_internal",
+        "//tensorflow/core:tensorflow",
     ],
 )
 

@@ -1,35 +1,55 @@
 package(default_visibility = ["//tensorflow:internal"])
 
-load("//tensorflow/tensorboard:web.bzl", "ts_web_library")
+load("@io_bazel_rules_closure//closure:defs.bzl", "web_library")
+load("//tensorflow/tensorboard:hacks.bzl", "tensorboard_typescript_bundle")
+load("//tensorflow/tensorboard:defs.bzl", "tensorboard_typescript_genrule")
 
 licenses(["notice"])  # Apache 2.0
 
-ts_web_library(
+web_library(
     name = "tf_color_scale",
     srcs = [
-        "colorScale.ts",
-        "palettes.ts",
+        "bundle.js",
         "tf-color-scale.html",
     ],
     path = "/tf-color-scale",
     deps = [
         "//tensorflow/tensorboard/components/tf_imports:d3",
-        "//tensorflow/tensorboard/components/tf_imports:polymer",
+        "@org_polymer",
     ],
 )
 
-ts_web_library(
+web_library(
     name = "demo",
     srcs = ["index.html"],
     path = "/tf-color-scale",
     deps = [
         ":tf_color_scale",
         "//tensorflow/tensorboard/components/tf_imports:d3",
-        "//tensorflow/tensorboard/components/tf_imports:webcomponentsjs",
         "@org_polymer_iron_demo_helpers",
         "@org_polymer_paper_button",
         "@org_polymer_paper_styles",
+        "@org_polymer_webcomponentsjs",
     ],
+)
+
+tensorboard_typescript_genrule(
+    name = "ts",
+    srcs = ["bundle.ts"],
+    typings = [
+        "@org_definitelytyped//:polymer.d.ts",
+        "@org_definitelytyped//:webcomponents.js.d.ts",
+        "//tensorflow/tensorboard/components/tf_imports:d3.d.ts",
+    ],
+)
+
+tensorboard_typescript_bundle(
+    name = "bundle",
+    out = "bundle.ts",
+    namespace_srcs = {"TF": [
+        "palettes.ts",
+        "colorScale.ts",
+    ]},
 )
 
 filegroup(

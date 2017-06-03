@@ -311,6 +311,7 @@ void ComputeComputationPostOrder(
 
   visited->insert(computation);
   post_order->push_back(computation);
+  return;
 }
 
 }  // namespace
