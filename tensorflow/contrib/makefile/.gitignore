@@ -1,2 +1,6 @@
 gen/
-downloads/
+downloads/gemmlowp/
+downloads/googletest/
+downloads/protobuf/
+downloads/re2/
+
