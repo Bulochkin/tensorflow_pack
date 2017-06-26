@@ -2,10 +2,8 @@ gen/bin/
 gen/dep/
 gen/host_bin/
 gen/host_obj/
-gen/lib/
 gen/obj/
 gen/proto_text/
-gen/protobuf_ios/
 gen/protobuf-host/
 downloads/gemmlowp/
 downloads/googletest/
